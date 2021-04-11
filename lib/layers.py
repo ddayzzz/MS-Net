@@ -1,5 +1,5 @@
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+# import tensorflow.contrib.slim as slim
 
 def weight_variable(shape, stddev=0.1, trainable=True, name=None):
     initial = tf.truncated_normal(shape, stddev=stddev)
@@ -213,8 +213,8 @@ def res_block(x, k, c_o, keep_prob_, stride=1, inc_dim = False, layers_num=2, is
         param: scope: setting for batch_norm variables
     """
 
-    _loc_scope_ = range(layers_num)
-    _inner_conv_ = range(layers_num)
+    _loc_scope_ = list(range(layers_num))
+    _inner_conv_ = list(range(layers_num))
 
     for i in range(layers_num):
         if scope is None:

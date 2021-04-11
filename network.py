@@ -1,3 +1,4 @@
+# coding=utf-8
 import os
 import glob
 import time
@@ -38,8 +39,9 @@ class Network(object):
         self.source_2_y = tf.placeholder("float", shape=[self.batch_size, self.label_size[0], self.label_size[1], self.n_class]) # source segmentation
         self.source_3 = tf.placeholder("float", shape=[self.batch_size, self.volume_size[0], self.volume_size[1], self.volume_size[2]])
         self.source_3_y = tf.placeholder("float", shape=[self.batch_size, self.label_size[0], self.label_size[1], self.n_class]) # source segmentation
-
+        # student 就是 universal netowork， teacher 则是DSBN
         """share encoder"""
+        # 不同的数据来源所共享的 encoder
         with tf.variable_scope("student_encoder", reuse = tf.AUTO_REUSE) as scope:
             with tf.device('/device:GPU:0'):
                 self.source_1_student_feature_pyramid = self.encoder(input_data = self.source_1, keep_prob = self.keep_prob, is_training = self.training_mode_encoder, bn_scope='source_1')
@@ -69,6 +71,7 @@ class Network(object):
         with tf.variable_scope("student_decoder", reuse = tf.AUTO_REUSE) as scope:
             with tf.device('/device:GPU:0'):
                     self.source_1_student_seg_logits = self.decoder(input_data = self.source_1_student_feature_pyramid, keep_prob = self.keep_prob, is_training = self.training_mode_decoder, bn_scope='source_1')
+                    # softmax 和 直接标明的类
                     self.source_1_student_softmaxpred = tf.nn.softmax(self.source_1_student_seg_logits)
                     self.source_1_student_pred_compact = tf.argmax(self.source_1_student_softmaxpred, 3) # predictions
             with tf.device('/device:GPU:1'):
@@ -87,27 +90,27 @@ class Network(object):
 
         """ Define Loss """
         self.source_1_teacher_hard_seg_loss, self.source_1_teacher_hard_seg_dice_loss, self.source_1_teacher_hard_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_1_teacher_seg_logits, softmaxpred = self.source_1_teacher_softmaxpred, seg_gt = self.source_1_y)
-        self.source_1_teacher_soft_seg_loss, self.source_1_teacher_soft_seg_dice_loss, self.source_1_teacher_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_1_teacher_seg_logits, softmaxpred = self.source_1_teacher_softmaxpred, seg_gt = tf.one_hot(self.source_1_student_pred_compact, depth=2))
+        self.source_1_teacher_soft_seg_loss, self.source_1_teacher_soft_seg_dice_loss, self.source_1_teacher_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_1_teacher_seg_logits, softmaxpred = self.source_1_teacher_softmaxpred, seg_gt = tf.one_hot(self.source_1_student_pred_compact, depth=3))
         self.source_2_teacher_hard_seg_loss, self.source_2_teacher_hard_seg_dice_loss, self.source_2_teacher_hard_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_2_teacher_seg_logits, softmaxpred = self.source_2_teacher_softmaxpred, seg_gt = self.source_2_y)
-        self.source_2_teacher_soft_seg_loss, self.source_2_teacher_soft_seg_dice_loss, self.source_2_teacher_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_2_teacher_seg_logits, softmaxpred = self.source_2_teacher_softmaxpred, seg_gt = tf.one_hot(self.source_2_student_pred_compact, depth=2))
+        self.source_2_teacher_soft_seg_loss, self.source_2_teacher_soft_seg_dice_loss, self.source_2_teacher_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_2_teacher_seg_logits, softmaxpred = self.source_2_teacher_softmaxpred, seg_gt = tf.one_hot(self.source_2_student_pred_compact, depth=3))
         self.source_3_teacher_hard_seg_loss, self.source_3_teacher_hard_seg_dice_loss, self.source_3_teacher_hard_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_3_teacher_seg_logits, softmaxpred = self.source_3_teacher_softmaxpred, seg_gt = self.source_3_y)
-        self.source_3_teacher_soft_seg_loss, self.source_3_teacher_soft_seg_dice_loss, self.source_3_teacher_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_3_teacher_seg_logits, softmaxpred = self.source_3_teacher_softmaxpred, seg_gt = tf.one_hot(self.source_3_student_pred_compact, depth=2))
+        self.source_3_teacher_soft_seg_loss, self.source_3_teacher_soft_seg_dice_loss, self.source_3_teacher_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_3_teacher_seg_logits, softmaxpred = self.source_3_teacher_softmaxpred, seg_gt = tf.one_hot(self.source_3_student_pred_compact, depth=3))
 
         self.source_1_student_hard_seg_loss, self.source_1_student_hard_seg_dice_loss, self.source_1_student_hard_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_1_student_seg_logits, softmaxpred = self.source_1_student_softmaxpred, seg_gt = self.source_1_y)
-        self.source_1_student_soft_seg_loss, self.source_1_student_soft_seg_dice_loss, self.source_1_student_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_1_student_seg_logits, softmaxpred = self.source_1_student_softmaxpred, seg_gt = tf.one_hot(self.source_1_teacher_pred_compact, depth=2))
+        self.source_1_student_soft_seg_loss, self.source_1_student_soft_seg_dice_loss, self.source_1_student_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_1_student_seg_logits, softmaxpred = self.source_1_student_softmaxpred, seg_gt = tf.one_hot(self.source_1_teacher_pred_compact, depth=3))
         self.source_2_student_hard_seg_loss, self.source_2_student_hard_seg_dice_loss, self.source_2_student_hard_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_2_student_seg_logits, softmaxpred = self.source_2_student_softmaxpred, seg_gt = self.source_2_y)
-        self.source_2_student_soft_seg_loss, self.source_2_student_soft_seg_dice_loss, self.source_2_student_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_2_student_seg_logits, softmaxpred = self.source_2_student_softmaxpred, seg_gt = tf.one_hot(self.source_2_teacher_pred_compact, depth=2))
+        self.source_2_student_soft_seg_loss, self.source_2_student_soft_seg_dice_loss, self.source_2_student_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_2_student_seg_logits, softmaxpred = self.source_2_student_softmaxpred, seg_gt = tf.one_hot(self.source_2_teacher_pred_compact, depth=3))
         self.source_3_student_hard_seg_loss, self.source_3_student_hard_seg_dice_loss, self.source_3_student_hard_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_3_student_seg_logits, softmaxpred = self.source_3_student_softmaxpred, seg_gt = self.source_3_y)
-        self.source_3_student_soft_seg_loss, self.source_3_student_soft_seg_dice_loss, self.source_3_student_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_3_student_seg_logits, softmaxpred = self.source_3_student_softmaxpred, seg_gt = tf.one_hot(self.source_3_teacher_pred_compact, depth=2))
+        self.source_3_student_soft_seg_loss, self.source_3_student_soft_seg_dice_loss, self.source_3_student_soft_seg_ce_loss  = self._get_segmentation_cost(seg_logits = self.source_3_student_seg_logits, softmaxpred = self.source_3_student_softmaxpred, seg_gt = tf.one_hot(self.source_3_teacher_pred_compact, depth=3))
 
         # self.source_1_student_soft_align_loss = self._get_inter_align_cost(self.source_1_student_feature_pyramid, self.source_1_teacher_feature_pyramid)
         # self.source_2_student_soft_align_loss = self._get_inter_align_cost(self.source_2_student_feature_pyramid, self.source_2_teacher_feature_pyramid)
         # self.source_3_student_soft_align_loss = self._get_inter_align_cost(self.source_3_student_feature_pyramid, self.source_3_teacher_feature_pyramid)
-
+        # 定义了 L_{aux}, aux branch 的输出 和 数据的原始 target 的 gt 进行 hard dice;teacher_variables 需要包含对 ecoder 和 aux brance 的参数（其实就是一个独立的decoder）
         self.source_1_teacher_total_loss = self.source_1_teacher_hard_seg_loss# * args.cost_kwargs["student_hard_dice"] + self.source_1_teacher_soft_seg_loss * args.cost_kwargs["student_soft_dice"]
         self.source_2_teacher_total_loss = self.source_2_teacher_hard_seg_loss# * args.cost_kwargs["student_hard_dice"] + self.source_2_teacher_soft_seg_loss * args.cost_kwargs["student_soft_dice"]
         self.source_3_teacher_total_loss = self.source_3_teacher_hard_seg_loss# * args.cost_kwargs["student_hard_dice"] + self.source_3_teacher_soft_seg_loss * args.cost_kwargs["student_soft_dice"]
-
+        # soft 和 hard dice 各取 0.5，L_uni, source_s_student_hard_seg_loss 为 L_{uni}^s, source_s_student_soft_seg_loss 则为 L_{kt}^s
         self.source_1_student_output_loss = self.source_1_student_hard_seg_loss * args.cost_kwargs["student_hard_dice"] + self.source_1_student_soft_seg_loss * args.cost_kwargs["student_soft_dice"] 
         self.source_2_student_output_loss = self.source_2_student_hard_seg_loss * args.cost_kwargs["student_hard_dice"] + self.source_2_student_soft_seg_loss * args.cost_kwargs["student_soft_dice"] 
         self.source_3_student_output_loss = self.source_3_student_hard_seg_loss * args.cost_kwargs["student_hard_dice"] + self.source_3_student_soft_seg_loss * args.cost_kwargs["student_soft_dice"] 
@@ -129,7 +132,14 @@ class Network(object):
         self.teacher_3_variables = tf.trainable_variables(scope="teacher_3")
         self.teacher_variables = self.teacher_1_variables + self.teacher_2_variables + self.teacher_3_variables +  tf.trainable_variables(scope="student_encoder")
         self.joint_variables = self.student_variables + self.teacher_1_variables + self.teacher_2_variables + self.teacher_3_variables
- 
+        # 需要预测的是一个 one-hot 的变量，所以用 logits 用 sigmoid 激活
+        self.source1_student_pred = tf.sigmoid(self.source_1_student_seg_logits)
+        self.source2_student_pred = tf.sigmoid(self.source_2_student_seg_logits)
+        self.source3_student_pred = tf.sigmoid(self.source_3_student_seg_logits)
+        self.source1_teacher_pred = tf.sigmoid(self.source_1_teacher_seg_logits)
+        self.source2_teacher_pred = tf.sigmoid(self.source_2_teacher_seg_logits)
+        self.source3_teacher_pred = tf.sigmoid(self.source_3_teacher_seg_logits)
+
 
     def encoder(self, input_data, keep_prob, is_training, feature_base = 32, bn_scope=''):
         conv1 = conv2d(input_data, 3, feature_base, keep_prob, name = 'conv_1')
@@ -158,24 +168,27 @@ class Network(object):
 
     def decoder(self, input_data, keep_prob, is_training, feature_base = 32, bn_scope=''):
         input_res1, input_res2, input_res3, input_res4, input_res5_2 = input_data
-
-        deconv6 = bn_relu_deconv2d(input_res5_2, 3, feature_base * 8, [self.batch_size, self.volume_size[0]/8, self.volume_size[1]/8, feature_base * 8], keep_prob, \
+        # out_channel = 256, output_shape = [B, 48,48, 256]
+        deconv6 = bn_relu_deconv2d(input_res5_2, 3, feature_base * 8, [self.batch_size, self.volume_size[0]//8, self.volume_size[1]//8, feature_base * 8], keep_prob, \
                                    is_training=is_training, stride=2, scope='up_sample_6', bn_scope=bn_scope)
         sum6 = concat2d(input_res4, deconv6)
+        #---------
         conv6 = conv2d(sum6, 3, feature_base * 8, keep_prob, name='conv_6')
         #conv6 = domain_adapter_specific(conv6, scope='adapter_6')
         res6 = res_block(conv6, 3, feature_base * 8, keep_prob, is_training=is_training, scope='res_6', bn_scope=bn_scope)
 
-        deconv7 = bn_relu_deconv2d(res6, 3, feature_base * 4, [self.batch_size, self.volume_size[0]/4, self.volume_size[1]/4, feature_base * 4], keep_prob, \
+        deconv7 = bn_relu_deconv2d(res6, 3, feature_base * 4, [self.batch_size, self.volume_size[0]//4, self.volume_size[1]//4, feature_base * 4], keep_prob, \
                                    is_training=is_training, stride=2, scope='up_sample_7', bn_scope=bn_scope)
         sum7 = concat2d(input_res3, deconv7)
+        # --------------
         conv7 = conv2d(sum7, 3, feature_base * 4, keep_prob, name='conv_7')
         #conv7 = domain_adapter_specific(conv7, scope='adapter_7')
         res7 = res_block(conv7, 3, feature_base * 4, keep_prob, is_training=is_training, scope='res_7', bn_scope=bn_scope)
 
-        deconv8 = bn_relu_deconv2d(res7, 3, feature_base * 2, [self.batch_size, self.volume_size[0]/2, self.volume_size[1]/2, feature_base * 2], keep_prob, \
+        deconv8 = bn_relu_deconv2d(res7, 3, feature_base * 2, [self.batch_size, self.volume_size[0]//2, self.volume_size[1]//2, feature_base * 2], keep_prob, \
                                    is_training=is_training, stride=2, scope='up_sample_8', bn_scope=bn_scope)
         sum8 = concat2d(input_res2, deconv8)
+        # ---------
         conv8 = conv2d(sum8, 3, feature_base * 2, keep_prob, name='conv_8')
         #conv8 = domain_adapter_specific(conv8, scope='adapter_8')
         res8 = res_block(conv8, 3, feature_base * 2, keep_prob, is_training=is_training, scope='res_8', bn_scope=bn_scope)
@@ -183,6 +196,7 @@ class Network(object):
         deconv9 = bn_relu_deconv2d(res8, 3, feature_base, [self.batch_size, self.volume_size[0], self.volume_size[1], feature_base], keep_prob, \
                                    is_training=is_training, stride=2, scope='up_sample_9', bn_scope=bn_scope)
         sum9 = concat2d(input_res1, deconv9)
+        # ------------
         conv9 = conv2d(sum9, 3, feature_base , keep_prob, name='conv_9')
         #conv9 = domain_adapter_specific(conv9, scope='adapter_9')
         res9 = res_block(conv9, 3, feature_base, keep_prob, is_training=is_training, scope='res_9', bn_scope=bn_scope)
@@ -201,7 +215,7 @@ class Network(object):
 
         dice = 0
 
-        for i in xrange(self.n_class):
+        for i in range(self.n_class):
             #inse = tf.reduce_sum(softmaxpred[:, :, :, i]*seg_gt[:, :, :, i])
             inse = tf.reduce_sum(softmaxpred[:, :, :, i]*seg_gt[:, :, :, i])
             l = tf.reduce_sum(softmaxpred[:, :, :, i])
@@ -210,7 +224,7 @@ class Network(object):
         dice_loss = 1 - 1.0 * dice / self.n_class
 
         ce_weighted = 0
-        for i in xrange(self.n_class):
+        for i in range(self.n_class):
             gti = seg_gt[:,:,:,i]
             predi = softmaxpred[:,:,:,i]
             ce_weighted += -1.0 * gti * tf.log(tf.clip_by_value(predi, 0.005, 1))

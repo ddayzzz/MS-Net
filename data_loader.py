@@ -1,15 +1,17 @@
+# coding=utf-8
 import tensorflow as tf
 import SimpleITK as sitk
 import numpy as np
 import os
 import scipy.ndimage
 import matplotlib.pyplot as plt
+from random import randint
 
-
-def _load_data(datalist, patch_size, batch_size, num_class):
+def _load_data(datalist, prefix, patch_size, batch_size, num_class):
 
     '''
     :param datalist:
+    :param prefix:
     :param num_patches:
     :param patch_size:
     :param batch_size:
@@ -18,17 +20,24 @@ def _load_data(datalist, patch_size, batch_size, num_class):
     image.shape=(batch_size,patch_size[0],patch_size[1],patch_size[2],1), dtype=tf.float32
     label.shape=(batch_size,patch_size[0],patch_size[1],patch_size[2],num_class, dtype=tf.int16)
     '''
-
+    # 代码参考 https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/data/Dataset
     with open(datalist, 'r') as fp:
         rows = fp.readlines()
-    image_list = [row[:-1] for row in rows]
+    image_list = [row.strip() for row in rows]
     # image_list = [image_list[0]] * 2 ## UNCOMMENT THIS TO SUPPLY ONLY ONE IMAGE, for debugging
 
     buffer_size = 150  # IMGS2BATCH * num_patches  # shuffle patches from 50 different images
     num_parallel_calls = 5          # num threads
     
-    get_patches_fn = lambda filename: tf.py_func(extract_patch, [filename, patch_size, num_class], [tf.float32, tf.float32])
-
+    get_patches_fn = lambda filename: tf.py_func(extract_patch, [filename, prefix, patch_size, num_class], [tf.float32, tf.float32])
+    """
+    按照顺序依次为：
+    1. 随机打乱
+    2. 无限重复
+    3. 从一个样本中输出多个patch
+    4. 去掉batch的维度
+    5. prefetch
+    """
     dataset =  (tf.data.Dataset.from_tensor_slices(image_list)
                .shuffle(buffer_size=buffer_size) # 5. shuffle the data # 1. all filenames go into the buffer (for good shuffling)
                .repeat() # repeat indefinitely (train.py will count the epochs)
@@ -44,10 +53,10 @@ def _load_data(datalist, patch_size, batch_size, num_class):
 
     return samples
 
-def extract_patch(filename, patch_size, num_class, num_patches=1, augmentation=False):
+def extract_patch(filename, prefix, patch_size, num_class, num_patches=1, augmentation=False):
     """Extracts a patch of given resolution and size at a specific location."""
 
-    image, mask = parse_fn(filename) # get the image and its mask
+    image, mask = parse_fn(prefix, filename) # get the image and its mask
     image_patches = []
     mask_patches = []
     num_patches_now = 0
@@ -66,8 +75,9 @@ def extract_patch(filename, patch_size, num_class, num_patches=1, augmentation=F
             mask_patch = mask_patch[::-1, ...] 
         if randint(0, 1) == 1:
             shift_pixel = randint(0,10)
-            image_patch = translate(image_patch, shift=shift_pixel)
-            mask_patch = translate(mask_patch, shift=shift_pixel)
+            if shift_pixel > 0:
+                image_patch = translate(image_patch, shift=shift_pixel)
+                mask_patch = translate(mask_patch, shift=shift_pixel)
 
         image_patches.append(image_patch)
         mask_patches.append(mask_patch)
@@ -112,7 +122,10 @@ def random_patch_center_z(mask, patch_size):
     if (np.min(limZ) + patch_size[2] // 2 + 1) < (np.max(limZ) - patch_size[2] // 2):
         z = np.random.randint(low = np.min(limZ) + patch_size[2] // 2 + 1, high = np.max(limZ) - patch_size[2] // 2)
     else:
-        z = np.random.randint(low = patchsize[2]//2, high = mask.shape[2] - patchsize[2]//2)
+        low = patch_size[2]//2
+        high = mask.shape[2] - patch_size[2]//2
+        print low, high
+        z = np.random.randint(low = patch_size[2]//2, high = mask.shape[2] - patch_size[2]//2)
 
     limX, limY, limZ = np.where(mask>0)
 
@@ -121,7 +134,7 @@ def random_patch_center_z(mask, patch_size):
     return z
 
 
-def parse_fn(data_path):
+def parse_fn(prefix, data_path):
     '''
     :param image_path: path to a folder of a patient
     :return: normalized entire image with its corresponding label
@@ -129,8 +142,8 @@ def parse_fn(data_path):
     For any image-level normalization, do it here
     '''
     path = data_path.split(",")
-    image_path = path[0]
-    label_path = path[1]
+    image_path = prefix + '/' + path[0]
+    label_path = prefix + '/' + path[1]
     #itk_image = zoom2shape(image_path, [512,512])#os.path.join(image_path, 'T1_unbiased_brain_rigid_to_mni.nii.gz'))
     #itk_mask = zoom2shape(label_path, [512,512], label=True)#os.path.join(image_path, 'T1_brain_seg_rigid_to_mni.nii.gz'))
     itk_image = sitk.ReadImage(image_path)#os.path.join(image_path, 'T1_unbiased_brain_rigid_to_mni.nii.gz'))
@@ -214,8 +227,10 @@ if __name__ == "__main__":
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-        data = _load_data(datalist='/research/pheng4/qdliu/Dou_Project/3D-UNet/data/mr_train_list', patch_size=[96, 96, 96], batch_size=2, num_class=5)
-
+        # data = _load_data(datalist='/research/pheng4/qdliu/Dou_Project/3D-UNet/data/mr_train_list', patch_size=[96, 96, 96], batch_size=2, num_class=5)
+        data = _load_data(datalist='/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/full/ISBI_1.5.txt',
+                          patch_size=[96, 96, 96], batch_size=2, num_class=5,
+                          prefix='/home/liuyuan/shu_codes/datasets/multi_site_prostate/origin_data')
         for _ in xrange(5):
 
             image, label = sess.run(data)

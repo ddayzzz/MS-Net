@@ -1,26 +1,26 @@
 import tensorflow as tf
-from tensorflow.python import debug as tf_debug
-import numpy as np
-import time
-import os
-import sys
-import logging
-import argparse
-import datetime
-import glob
 import random
+import os
+import numpy as np
+
+
+seed = 42
+os.environ['PYTHONHASHSEED'] = str(seed)
+np.random.seed(1 + seed)
+
+tf.set_random_seed(12 + seed)
+random.seed(123 + seed)
+
+import sys
+import argparse
 
 from lib.utils import *
-from lib.utils import _read_lists
 from network  import Network 
 from train import Trainer
-from test import Tester
+# from test import Tester
 from tensorflow.core.protobuf import rewriter_config_pb2
 
 
-currtime = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-tf.set_random_seed(2)
-## train segmentation CNN for MRI
 
 """parsing and configuration"""
 def parse_args(train_date):
@@ -31,15 +31,15 @@ def parse_args(train_date):
     parser.add_argument('--dataset', type=str, default='CT2MR', help='dataset_name')
     parser.add_argument('--augment_flag', type=bool, default=False, help='Image augmentation use or not')
 
-    parser.add_argument('--volume_size', type=list, default=[384, 384, 3], help='The size of input data')
-    parser.add_argument('--label_size', type=list, default=[384, 384, 1], help='The size of label')
-    parser.add_argument('--n_class', type=int, default=2, help='The size of class')
+    parser.add_argument('--volume_size', type=list, default=[224, 224, 4], help='The size of input data')
+    parser.add_argument('--label_size', type=list, default=[224, 224, 3], help='The size of label')
+    parser.add_argument('--n_class', type=int, default=3, help='The size of class')
 
     parser.add_argument('--lr', type=float, default=0.001, help='The learning rate')
     parser.add_argument('--lr_decay', type=float, default=0.95, help='The learning rate decay rate')
     parser.add_argument('--epoch', type=int, default=100, help='The number of epochs to run')
     parser.add_argument('--iteration', type=int, default=500, help='The number of training iterations')
-    parser.add_argument('--batch_size', type=int, default=1, help='The batch size')
+    parser.add_argument('--batch_size', type=int, default=16, help='The batch size')
     parser.add_argument('--save_freq', type=int, default=500, help='The number of ckpt_save_freq')
     parser.add_argument('--display_freq', type=int, default=5, help='The frequency to write tensorboard')
     parser.add_argument('--restored_model', type=str, default=None, help='Model to restore')
@@ -77,15 +77,19 @@ def parse_args(train_date):
 
 """checking arguments"""
 def check_args(args):
+    import time
+    sub = f"brats_msnet/{time.strftime('exp_%Y-%m-%dT%H-%M-%S')}"
+    # 重新指定文件夹
+    args.checkpoint_dir = f"{sub}/checkpoint"
     # --checkpoint_dir
     check_folder(args.checkpoint_dir)
-
+    args.result_dir = f'{sub}/results'
     # --result_dir
     check_folder(args.result_dir)
-
+    args.log_dir = f'{sub}/log'
     # --result_dir
     check_folder(args.log_dir)
-
+    args.sample_dir = f'{sub}/samples'
     # --sample_dir
     check_folder(args.sample_dir)
 
@@ -93,7 +97,7 @@ def check_args(args):
 
 def main():
     # parse arguments
-    train_date = 'xx_xxxx'
+    train_date = '2021-04-09'
     args = parse_args(train_date)
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
@@ -102,16 +106,19 @@ def main():
     logging.basicConfig(filename=args.log_dir+"/"+args.phase+'_log.txt', level=logging.DEBUG, format='%(asctime)s %(message)s')
     logging.getLogger().addHandler(logging.StreamHandler())
 
-    args.source_1_train_list = '/research/pheng4/qdliu/Prostate/MultiSource_2/dataset/ISBI_train_list'
-    args.source_1_val_list = '/research/pheng4/qdliu/Prostate/MultiSource_2/dataset/ISBI_val_list'
-    args.source_2_train_list = '/research/pheng4/qdliu/Prostate/MultiSource_2/dataset/ISBI_1.5_train_list'
-    args.source_2_val_list = '/research/pheng4/qdliu/Prostate/MultiSource_2/dataset/ISBI_1.5_val_list'
-    args.source_3_train_list = '/research/pheng4/qdliu/Prostate/MultiSource_2/dataset/I2CVB_train_list'
-    args.source_3_val_list = '/research/pheng4/qdliu/Prostate/MultiSource_2/dataset/I2CVB_val_list'
-
-    args.test_1_list = '/research/pheng4/qdliu/Prostate/MultiSource_2/dataset/ISBI_test_list'
-    args.test_2_list = '/research/pheng4/qdliu/Prostate/MultiSource_2/dataset/ISBI_1.5_test_list'
-    args.test_3_list = '/research/pheng4/qdliu/Prostate/MultiSource_2/dataset/I2CVB_test_list'
+    # args.source_1_train_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/ISBI_3_train.txt'
+    # args.source_1_val_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/ISBI_3_test.txt'
+    # args.source_2_train_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/ISBI_1.5_train.txt'
+    # args.source_2_val_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/ISBI_1.5_test.txt'
+    # args.source_3_train_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/I2CVB_train.txt'
+    # args.source_3_val_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/I2CVB_test.txt'
+    #
+    # args.test_1_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/ISBI_3_test.txt'
+    # args.test_2_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/ISBI_1.5_test.txt'
+    # args.test_3_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/I2CVB_test.txt'
+    args.source1_dir = '/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_1_5'
+    args.source2_dir = '/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_3'
+    args.source3_dir = '/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/GENESIS_SIGNA_drop_3'
 
     args.cost_kwargs = {
         "seg_dice": 1,
@@ -156,12 +163,14 @@ def main():
         # show network architecture
         show_all_variables()
 
-        if args.phase == 'train' :
+        if args.phase == 'train':
             trainer = Trainer(args, sess, network=network)
             trainer.train()
 
-        if args.phase == 'test' :
-            tester = Tester(args, sess, network = network)
-            seg_dice = tester.test()
+        if args.phase == 'test':
+            # tester = Tester(args, sess, network = network)
+            # seg_dice = tester.test()
+            pass
+
 if __name__ == "__main__":
     main()
