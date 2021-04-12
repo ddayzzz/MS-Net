@@ -419,56 +419,69 @@ class Trainer(object):
         scalar_summaries.append(tf.summary.scalar("overall_dice_loss", self.net.overall_dice_loss))
         # scalar_summaries.append(tf.summary.scalar("source_3_student_inter_loss", self.net.source_3_student_inter_loss))
 
-        train_images.append(tf.summary.image("source_1_student_pred_train",
-                                             tf.expand_dims(tf.cast(self.net.source_1_student_pred_compact, tf.float32),
-                                                            3)))
-        train_images.append(tf.summary.image('source_1_student_image_train',
-                                             tf.expand_dims(tf.cast(self.net.source_1[:, :, :, 1], tf.float32), 3)))
-        train_images.append(tf.summary.image('source_1_student_gt_train',
-                                             tf.expand_dims(tf.cast(self.net.source_1_y_compact, tf.float32), 3)))
+        # train_images.append(tf.summary.image("source_1_student_pred_train",
+        #                                      tf.expand_dims(tf.cast(self.net.source_1_student_pred_compact, tf.float32),
+        #                                                     3)))
+        # train_images.append(tf.summary.image('source_1_student_image_train',
+        #                                      tf.expand_dims(tf.cast(self.net.source_1[:, :, :, 1], tf.float32), 3)))
+        # train_images.append(tf.summary.image('source_1_student_gt_train',
+        #                                      tf.expand_dims(tf.cast(self.net.source_1_y_compact, tf.float32), 3)))
 
-        val_images.append(tf.summary.image("source_1_student_pred_val",
-                                           tf.expand_dims(tf.cast(self.net.source_1_student_pred_compact, tf.float32),
-                                                          3)))
-        val_images.append(tf.summary.image('source_1_student_image_val',
-                                           tf.expand_dims(tf.cast(self.net.source_1[:, :, :, 1], tf.float32), 3)))
-
-        train_images.append(tf.summary.image("source_2_student_pred_train",
-                                             tf.expand_dims(tf.cast(self.net.source_2_student_pred_compact, tf.float32),
-                                                            3)))
-        train_images.append(tf.summary.image('source_2_student_image_train',
-                                             tf.expand_dims(tf.cast(self.net.source_2[:, :, :, 1], tf.float32), 3)))
-        train_images.append(tf.summary.image('source_2_student_gt_train',
-                                             tf.expand_dims(tf.cast(self.net.source_2_y_compact, tf.float32), 3)))
-
-        val_images.append(tf.summary.image("source_2_student_pred_val",
-                                           tf.expand_dims(tf.cast(self.net.source_2_student_pred_compact, tf.float32),
-                                                          3)))
-        val_images.append(tf.summary.image('source_2_student_image_val',
-                                           tf.expand_dims(tf.cast(self.net.source_2[:, :, :, 1], tf.float32), 3)))
-
-        train_images.append(tf.summary.image("source_3_student_pred_train",
-                                             tf.expand_dims(tf.cast(self.net.source_3_student_pred_compact, tf.float32),
-                                                            3)))
-        train_images.append(tf.summary.image('source_3_student_image_train',
-                                             tf.expand_dims(tf.cast(self.net.source_3[:, :, :, 1], tf.float32), 3)))
-        train_images.append(tf.summary.image('source_3_student_gt_train',
-                                             tf.expand_dims(tf.cast(self.net.source_3_y_compact, tf.float32), 3)))
-
-        val_images.append(tf.summary.image("source_3_student_pred_val",
-                                           tf.expand_dims(tf.cast(self.net.source_3_student_pred_compact, tf.float32),
-                                                          3)))
-        val_images.append(tf.summary.image('source_3_student_image_val',
-                                           tf.expand_dims(tf.cast(self.net.source_3[:, :, :, 1], tf.float32), 3)))
+        # val_images.append(tf.summary.image("source_1_student_pred_val",
+        #                                    tf.expand_dims(tf.cast(self.net.source_1_student_pred_compact, tf.float32),
+        #                                                   3)))
+        # val_images.append(tf.summary.image('source_1_student_image_val',
+        #                                    tf.expand_dims(tf.cast(self.net.source_1[:, :, :, 1], tf.float32), 3)))
+        #
+        # train_images.append(tf.summary.image("source_2_student_pred_train",
+        #                                      tf.expand_dims(tf.cast(self.net.source_2_student_pred_compact, tf.float32),
+        #                                                     3)))
+        # train_images.append(tf.summary.image('source_2_student_image_train',
+        #                                      tf.expand_dims(tf.cast(self.net.source_2[:, :, :, 1], tf.float32), 3)))
+        # train_images.append(tf.summary.image('source_2_student_gt_train',
+        #                                      tf.expand_dims(tf.cast(self.net.source_2_y_compact, tf.float32), 3)))
+        #
+        # val_images.append(tf.summary.image("source_2_student_pred_val",
+        #                                    tf.expand_dims(tf.cast(self.net.source_2_student_pred_compact, tf.float32),
+        #                                                   3)))
+        # val_images.append(tf.summary.image('source_2_student_image_val',
+        #                                    tf.expand_dims(tf.cast(self.net.source_2[:, :, :, 1], tf.float32), 3)))
+        #
+        # train_images.append(tf.summary.image("source_3_student_pred_train",
+        #                                      tf.expand_dims(tf.cast(self.net.source_3_student_pred_compact, tf.float32),
+        #                                                     3)))
+        # train_images.append(tf.summary.image('source_3_student_image_train',
+        #                                      tf.expand_dims(tf.cast(self.net.source_3[:, :, :, 1], tf.float32), 3)))
+        # train_images.append(tf.summary.image('source_3_student_gt_train',
+        #                                      tf.expand_dims(tf.cast(self.net.source_3_y_compact, tf.float32), 3)))
+        #
+        # val_images.append(tf.summary.image("source_3_student_pred_val",
+        #                                    tf.expand_dims(tf.cast(self.net.source_3_student_pred_compact, tf.float32),
+        #                                                   3)))
+        # val_images.append(tf.summary.image('source_3_student_image_val',
+        #                                    tf.expand_dims(tf.cast(self.net.source_3[:, :, :, 1], tf.float32), 3)))
 
         self.source_scalar_summary_op = tf.summary.merge(scalar_summaries)
-        self.source_train_image_summary_op = tf.summary.merge(train_images)
-        self.source_val_image_summary_op = tf.summary.merge(val_images)
+        # self.source_train_image_summary_op = tf.summary.merge(train_images)
+        # self.source_val_image_summary_op = tf.summary.merge(val_images)
 
     def minibatch_stats_segmenter_source(self, summary_writer, step, batch_x_1, batch_y_1, batch_x_2, batch_y_2,
                                          batch_x_3, batch_y_3):
 
-        summary_str, summary_img = self.sess.run([self.source_scalar_summary_op, self.source_val_image_summary_op],
+        # summary_str, summary_img = self.sess.run([self.source_scalar_summary_op, self.source_val_image_summary_op],
+        #                                          feed_dict={self.net.source_1: batch_x_1,
+        #                                                     self.net.source_1_y: batch_y_1,
+        #                                                     self.net.source_2: batch_x_2,
+        #                                                     self.net.source_2_y: batch_y_2,
+        #                                                     self.net.source_3: batch_x_3,
+        #                                                     self.net.source_3_y: batch_y_3,
+        #                                                     self.net.training_mode_encoder: False,
+        #                                                     self.net.training_mode_decoder: False,
+        #                                                     self.net.keep_prob: 1.})
+        # summary_writer.add_summary(summary_str, step)
+        # summary_writer.add_summary(summary_img, step)
+        # summary_writer.flush()
+        summary_str = self.sess.run(self.source_scalar_summary_op,
                                                  feed_dict={self.net.source_1: batch_x_1,
                                                             self.net.source_1_y: batch_y_1,
                                                             self.net.source_2: batch_x_2,
@@ -479,5 +492,5 @@ class Trainer(object):
                                                             self.net.training_mode_decoder: False,
                                                             self.net.keep_prob: 1.})
         summary_writer.add_summary(summary_str, step)
-        summary_writer.add_summary(summary_img, step)
+        # summary_writer.add_summary(summary_img, step)
         summary_writer.flush()
