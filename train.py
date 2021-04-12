@@ -273,7 +273,7 @@ class Trainer(object):
                         f.write(
                             f"\tsource ave dice teacher is: {(dice_teacher_1 + dice_teacher_2 + dice_teacher_3) / 3}\n")
                         f.write(
-                            f"\tsource ave dice student is: {(dice_student_1 + dice_student_2 + dice_student_3) / 3}")
+                            f"\tsource ave dice student is: {(dice_student_1 + dice_student_2 + dice_student_3) / 3}\n")
                         # 输出到控制台
                         logging.info(f"step: {self.global_step.eval()}\n"
                                      f"\tsource 1 dice teacher is : {dice_teacher_1}, {dice_arr_teacher_1}\n"

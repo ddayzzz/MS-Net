@@ -144,12 +144,36 @@ def bn_leaky_relu_conv2d_layer(x, k, c_o, keep_prob_, stride=1, is_training=True
     return tf.nn.dropout(conv2d_layer, keep_prob_)
 
 def bn_relu_deconv2d(x, k, c_o, output_shape, keep_prob_, stride=1, is_training=True, scope='', trainable=True, bn_scope=''):
+    # https://stackoverflow.com/questions/46885191/tf-nn-conv2d-transpose-output-shape-dynamic-batch-size
+    # 用来动态计算 conv2d 输出的维度
+    def _get2d_deconv_output_size(input_height, input_width,
+                                  filter_height, filter_width,
+                                  stride, padding_type):
+        if padding_type == 'VALID':
+            out_height = (input_height - 1) * stride + filter_height
+            out_width = (input_width - 1) * stride + filter_width
+
+        elif padding_type == 'SAME':
+            out_height = input_height * stride
+            out_width = input_width * stride
+
+        return out_height, out_width
 
     c_i = x.get_shape().as_list()[-1]
     w = weight_variable(shape=[k, k, c_o, c_i], trainable=trainable, name=scope+'_kernel')
 
     bn_layer = batch_norm(x, is_training=is_training, scope=scope+'/'+bn_scope, trainable = trainable)
     relu_layer = tf.nn.relu(bn_layer)
+    #
+    in_dims = x.get_shape().as_list()
+    in_height, in_width = in_dims[1], in_dims[2]
+    out_height, out_width = _get2d_deconv_output_size(input_height=in_height,
+                                                      input_width=in_width,
+                                                      filter_width=k,
+                                                      filter_height=k,
+                                                      stride=stride,
+                                                      padding_type='SAME')
+    output_shape = tf.stack([tf.shape(x)[0], out_height, out_width, c_o])
     deconv2d_layer = tf.nn.conv2d_transpose(relu_layer, w, output_shape, strides=[1,stride,stride,1], padding='SAME')
 
     return tf.nn.dropout(deconv2d_layer, keep_prob_)

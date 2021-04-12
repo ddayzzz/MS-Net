@@ -33,12 +33,12 @@ class Network(object):
         self.keep_prob = tf.placeholder(dtype=tf.float32, name = "dropout_keep_rate")  # dropout (keep probability
         self.miu_gan_gen = tf.placeholder(dtype=tf.float32, name = "miu_gan_gen") 
         self.miu_gan_dis = tf.placeholder(dtype=tf.float32, name = "miu_gan_dis") 
-        self.source_1 = tf.placeholder("float", shape=[self.batch_size, self.volume_size[0], self.volume_size[1], self.volume_size[2]])
-        self.source_1_y = tf.placeholder("float", shape=[self.batch_size, self.label_size[0], self.label_size[1], self.n_class]) # source segmentation
-        self.source_2 = tf.placeholder("float", shape=[self.batch_size, self.volume_size[0], self.volume_size[1], self.volume_size[2]])
-        self.source_2_y = tf.placeholder("float", shape=[self.batch_size, self.label_size[0], self.label_size[1], self.n_class]) # source segmentation
-        self.source_3 = tf.placeholder("float", shape=[self.batch_size, self.volume_size[0], self.volume_size[1], self.volume_size[2]])
-        self.source_3_y = tf.placeholder("float", shape=[self.batch_size, self.label_size[0], self.label_size[1], self.n_class]) # source segmentation
+        self.source_1 = tf.placeholder("float", shape=[None, self.volume_size[0], self.volume_size[1], self.volume_size[2]])
+        self.source_1_y = tf.placeholder("float", shape=[None, self.label_size[0], self.label_size[1], self.n_class]) # source segmentation
+        self.source_2 = tf.placeholder("float", shape=[None, self.volume_size[0], self.volume_size[1], self.volume_size[2]])
+        self.source_2_y = tf.placeholder("float", shape=[None, self.label_size[0], self.label_size[1], self.n_class]) # source segmentation
+        self.source_3 = tf.placeholder("float", shape=[None, self.volume_size[0], self.volume_size[1], self.volume_size[2]])
+        self.source_3_y = tf.placeholder("float", shape=[None, self.label_size[0], self.label_size[1], self.n_class]) # source segmentation
         # student 就是 universal netowork， teacher 则是DSBN
         """share encoder"""
         # 不同的数据来源所共享的 encoder
@@ -133,12 +133,12 @@ class Network(object):
         self.teacher_variables = self.teacher_1_variables + self.teacher_2_variables + self.teacher_3_variables +  tf.trainable_variables(scope="student_encoder")
         self.joint_variables = self.student_variables + self.teacher_1_variables + self.teacher_2_variables + self.teacher_3_variables
         # 需要预测的是一个 one-hot 的变量，所以用 logits 用 sigmoid 激活
-        self.source1_student_pred = tf.sigmoid(self.source_1_student_seg_logits)
-        self.source2_student_pred = tf.sigmoid(self.source_2_student_seg_logits)
-        self.source3_student_pred = tf.sigmoid(self.source_3_student_seg_logits)
-        self.source1_teacher_pred = tf.sigmoid(self.source_1_teacher_seg_logits)
-        self.source2_teacher_pred = tf.sigmoid(self.source_2_teacher_seg_logits)
-        self.source3_teacher_pred = tf.sigmoid(self.source_3_teacher_seg_logits)
+        self.source1_student_pred = tf.cast(tf.sigmoid(self.source_1_student_seg_logits) > 0.5, tf.float32)
+        self.source2_student_pred = tf.cast(tf.sigmoid(self.source_2_student_seg_logits) > 0.5, tf.float32)
+        self.source3_student_pred = tf.cast(tf.sigmoid(self.source_3_student_seg_logits) > 0.5, tf.float32)
+        self.source1_teacher_pred = tf.cast(tf.sigmoid(self.source_1_teacher_seg_logits) > 0.5, tf.float32)
+        self.source2_teacher_pred = tf.cast(tf.sigmoid(self.source_2_teacher_seg_logits) > 0.5, tf.float32)
+        self.source3_teacher_pred = tf.cast(tf.sigmoid(self.source_3_teacher_seg_logits) > 0.5, tf.float32)
 
 
     def encoder(self, input_data, keep_prob, is_training, feature_base = 32, bn_scope=''):
@@ -169,7 +169,7 @@ class Network(object):
     def decoder(self, input_data, keep_prob, is_training, feature_base = 32, bn_scope=''):
         input_res1, input_res2, input_res3, input_res4, input_res5_2 = input_data
         # out_channel = 256, output_shape = [B, 48,48, 256]
-        deconv6 = bn_relu_deconv2d(input_res5_2, 3, feature_base * 8, [self.batch_size, self.volume_size[0]//8, self.volume_size[1]//8, feature_base * 8], keep_prob, \
+        deconv6 = bn_relu_deconv2d(input_res5_2, 3, feature_base * 8, [None, self.volume_size[0]//8, self.volume_size[1]//8, feature_base * 8], keep_prob, \
                                    is_training=is_training, stride=2, scope='up_sample_6', bn_scope=bn_scope)
         sum6 = concat2d(input_res4, deconv6)
         #---------
@@ -177,7 +177,7 @@ class Network(object):
         #conv6 = domain_adapter_specific(conv6, scope='adapter_6')
         res6 = res_block(conv6, 3, feature_base * 8, keep_prob, is_training=is_training, scope='res_6', bn_scope=bn_scope)
 
-        deconv7 = bn_relu_deconv2d(res6, 3, feature_base * 4, [self.batch_size, self.volume_size[0]//4, self.volume_size[1]//4, feature_base * 4], keep_prob, \
+        deconv7 = bn_relu_deconv2d(res6, 3, feature_base * 4, [None, self.volume_size[0]//4, self.volume_size[1]//4, feature_base * 4], keep_prob, \
                                    is_training=is_training, stride=2, scope='up_sample_7', bn_scope=bn_scope)
         sum7 = concat2d(input_res3, deconv7)
         # --------------
@@ -185,7 +185,7 @@ class Network(object):
         #conv7 = domain_adapter_specific(conv7, scope='adapter_7')
         res7 = res_block(conv7, 3, feature_base * 4, keep_prob, is_training=is_training, scope='res_7', bn_scope=bn_scope)
 
-        deconv8 = bn_relu_deconv2d(res7, 3, feature_base * 2, [self.batch_size, self.volume_size[0]//2, self.volume_size[1]//2, feature_base * 2], keep_prob, \
+        deconv8 = bn_relu_deconv2d(res7, 3, feature_base * 2, [None, self.volume_size[0]//2, self.volume_size[1]//2, feature_base * 2], keep_prob, \
                                    is_training=is_training, stride=2, scope='up_sample_8', bn_scope=bn_scope)
         sum8 = concat2d(input_res2, deconv8)
         # ---------
@@ -193,7 +193,7 @@ class Network(object):
         #conv8 = domain_adapter_specific(conv8, scope='adapter_8')
         res8 = res_block(conv8, 3, feature_base * 2, keep_prob, is_training=is_training, scope='res_8', bn_scope=bn_scope)
 
-        deconv9 = bn_relu_deconv2d(res8, 3, feature_base, [self.batch_size, self.volume_size[0], self.volume_size[1], feature_base], keep_prob, \
+        deconv9 = bn_relu_deconv2d(res8, 3, feature_base, [None, self.volume_size[0], self.volume_size[1], feature_base], keep_prob, \
                                    is_training=is_training, stride=2, scope='up_sample_9', bn_scope=bn_scope)
         sum9 = concat2d(input_res1, deconv9)
         # ------------

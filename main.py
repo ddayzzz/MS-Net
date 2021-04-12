@@ -35,10 +35,10 @@ def parse_args(train_date):
     parser.add_argument('--label_size', type=list, default=[224, 224, 3], help='The size of label')
     parser.add_argument('--n_class', type=int, default=3, help='The size of class')
 
-    parser.add_argument('--lr', type=float, default=0.001, help='The learning rate')
+    parser.add_argument('--lr', type=float, default=0.0001, help='The learning rate')
     parser.add_argument('--lr_decay', type=float, default=0.95, help='The learning rate decay rate')
     parser.add_argument('--epoch', type=int, default=100, help='The number of epochs to run')
-    parser.add_argument('--iteration', type=int, default=500, help='The number of training iterations')
+    parser.add_argument('--iteration', type=int, default=250, help='The number of training iterations')
     parser.add_argument('--batch_size', type=int, default=16, help='The batch size')
     parser.add_argument('--save_freq', type=int, default=500, help='The number of ckpt_save_freq')
     parser.add_argument('--display_freq', type=int, default=5, help='The frequency to write tensorboard')
