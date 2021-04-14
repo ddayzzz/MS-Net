@@ -1,3 +1,5 @@
+import logging
+
 import tensorflow as tf
 import random
 import os
@@ -15,7 +17,6 @@ import sys
 import argparse
 
 from lib.utils import *
-from network  import Network 
 from train import Trainer
 # from test import Tester
 from tensorflow.core.protobuf import rewriter_config_pb2
@@ -30,15 +31,19 @@ def parse_args(train_date):
     parser.add_argument('--phase', type=str, default='train', help='train or test or guide')
     parser.add_argument('--dataset', type=str, default='CT2MR', help='dataset_name')
     parser.add_argument('--augment_flag', type=bool, default=False, help='Image augmentation use or not')
+    parser.add_argument('--num_folds', type=int, default=5, help='Fold 的数量')
+    parser.add_argument('--fold_id', type=int, required=True, help='选择的 Fold 的分类')
 
     parser.add_argument('--volume_size', type=list, default=[224, 224, 4], help='The size of input data')
     parser.add_argument('--label_size', type=list, default=[224, 224, 3], help='The size of label')
     parser.add_argument('--n_class', type=int, default=3, help='The size of class')
+    parser.add_argument('--msnet', default=False, action='store_true', help='是否使用 MS-Net 的网络')
 
     parser.add_argument('--lr', type=float, default=0.0001, help='The learning rate')
     parser.add_argument('--lr_decay', type=float, default=0.95, help='The learning rate decay rate')
     parser.add_argument('--epoch', type=int, default=50, help='The number of epochs to run')
-    parser.add_argument('--iteration', type=int, default=200, help='The number of training iterations')
+    # 这里按照最低的数据集的iteration，最高是200
+    parser.add_argument('--iteration', type=int, default=100, help='The number of training iterations')
     parser.add_argument('--batch_size', type=int, default=16, help='The batch size')
     parser.add_argument('--save_freq', type=int, default=500, help='The number of ckpt_save_freq')
     parser.add_argument('--display_freq', type=int, default=5, help='The frequency to write tensorboard')
@@ -78,7 +83,10 @@ def parse_args(train_date):
 """checking arguments"""
 def check_args(args):
     import time
-    sub = f"brats_msnet/{time.strftime('exp_%Y-%m-%dT%H-%M-%S')}"
+    if args.msnet:
+        sub = f"brats_msnet_kfold/fold_{args.num_folds}_foldid_{args.fold_id}/{time.strftime('exp_%Y-%m-%dT%H-%M-%S')}"
+    else:
+        sub = f"brats_flnet_kfold/fold_{args.num_folds}_foldid_{args.fold_id}/{time.strftime('exp_%Y-%m-%dT%H-%M-%S')}"
     # 重新指定文件夹
     args.checkpoint_dir = f"{sub}/checkpoint"
     # --checkpoint_dir
@@ -116,9 +124,15 @@ def main():
     # args.test_1_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/ISBI_3_test.txt'
     # args.test_2_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/ISBI_1.5_test.txt'
     # args.test_3_list = '/home/liuyuan/shu_codes/datasets/multi_site_prostate/cfgs/train8_test2/I2CVB_test.txt'
-    args.source1_dir = '/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_1_5'
-    args.source2_dir = '/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_3'
-    args.source3_dir = '/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/GENESIS_SIGNA_drop_3'
+    # GPU 12000 上的位置
+    # args.source1_dir = '/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_1_5'
+    # args.source2_dir = '/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_3'
+    # args.source3_dir = '/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/GENESIS_SIGNA_drop_3'
+
+    # GPU 1000上的设置
+    args.source1_dir = '/home/wangshu/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_1_5'
+    args.source2_dir = '/home/wangshu/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_3'
+    args.source3_dir = '/home/wangshu/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/GENESIS_SIGNA_drop_3'
 
     args.cost_kwargs = {
         "seg_dice": 1,
@@ -154,11 +168,17 @@ def main():
     # open session
     
     with tf.Session(config=config_proto) as sess:
-        if args.phase == 'test' :
+        if args.phase == 'test':
             args.batch_size = 1
 
         logging.info("Network built")
-        network = Network(args)
+        logging.info(f"Whether use MS-Net: {args.msnet}")
+        if args.msnet:
+            from network import Network
+            network = Network(args)
+        else:
+            from network_fl import NetworkFL
+            network = NetworkFL(args)
 
         # show network architecture
         show_all_variables()

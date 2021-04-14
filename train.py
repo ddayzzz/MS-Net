@@ -1,4 +1,5 @@
 # coding=utf-8
+import json
 import os
 import time
 import numpy as np
@@ -6,7 +7,7 @@ import logging
 import tensorflow as tf
 import re
 # import data_loader
-from data.brats import BrainSegmentationDataset
+from data.brats import BrainSegmentationDataset, BrainSegmentationKFoldDataset
 import SimpleITK as sitk
 from scipy import ndimage
 
@@ -50,6 +51,8 @@ class Trainer(object):
         self.batch_size = args.batch_size
         self.epoch = args.epoch
         self.iteration = args.iteration
+        self.num_folds = args.num_folds
+        self.fold_id = args.fold_id
 
         self.lr = args.lr
         self.lr_decay = args.lr_decay
@@ -81,6 +84,9 @@ class Trainer(object):
         self.log_dir = args.log_dir
         self.checkpoint_dir = args.checkpoint_dir
         self.result_dir = args.result_dir
+        self.source1_dice_loss_record = []
+        self.source2_dice_loss_record = []
+        self.source3_dice_loss_record = []
 
     def _get_optimizers(self):
 
@@ -119,7 +125,7 @@ class Trainer(object):
         self._init_tfboard()
 
         config = tf.ConfigProto(log_device_placement=True, allow_soft_placement=True)
-        config.gpu_options.allow_growth = False
+        config.gpu_options.allow_growth = True
 
         if self.restored_model is not None:
             self.restore_model(self.restored_model)
@@ -140,28 +146,55 @@ class Trainer(object):
         # self.source_2_val = data_loader._load_data(datalist=self.source_2_val_list, patch_size=self.volume_size, batch_size=self.batch_size, num_class=self.n_class, prefix=prefix)
         # self.source_3_train = data_loader._load_data(datalist=self.source_3_train_list, patch_size=self.volume_size, batch_size=self.batch_size, num_class=self.n_class, prefix=prefix)
         # self.source_3_val = data_loader._load_data(datalist=self.source_3_val_list, patch_size=self.volume_size, batch_size=self.batch_size, num_class=self.n_class, prefix=prefix)
-        self.source1_train = BrainSegmentationDataset(self.args.source1_dir, batch_size=self.batch_size, subset='train',
-                                                      validation_cases=5,
-                                                      seed=42)
-        self.source2_train = BrainSegmentationDataset(self.args.source2_dir, batch_size=self.batch_size, subset='train',
-                                                      validation_cases=5,
-                                                      seed=42)
-        self.source3_train = BrainSegmentationDataset(self.args.source3_dir, batch_size=self.batch_size, subset='train',
-                                                      validation_cases=5,
-                                                      seed=42)
+        # self.source1_train = BrainSegmentationDataset(self.args.source1_dir, batch_size=self.batch_size, subset='train',
+        #                                               validation_cases=5,
+        #                                               seed=42)
+        # self.source2_train = BrainSegmentationDataset(self.args.source2_dir, batch_size=self.batch_size, subset='train',
+        #                                               validation_cases=5,
+        #                                               seed=42)
+        # self.source3_train = BrainSegmentationDataset(self.args.source3_dir, batch_size=self.batch_size, subset='train',
+        #                                               validation_cases=5,
+        #                                               seed=42)
+        #
+        # self.source1_test = BrainSegmentationDataset(self.args.source1_dir, batch_size=self.batch_size,
+        #                                              subset='validation',
+        #                                              validation_cases=5,
+        #                                              seed=42)
+        # self.source2_test = BrainSegmentationDataset(self.args.source2_dir, batch_size=self.batch_size,
+        #                                              subset='validation',
+        #                                              validation_cases=5,
+        #                                              seed=42)
+        # self.source3_test = BrainSegmentationDataset(self.args.source3_dir, batch_size=self.batch_size,
+        #                                              subset='validation',
+        #                                              validation_cases=5,
+        #                                              seed=42)
 
-        self.source1_test = BrainSegmentationDataset(self.args.source1_dir, batch_size=self.batch_size,
-                                                     subset='validation',
-                                                     validation_cases=5,
-                                                     seed=42)
-        self.source2_test = BrainSegmentationDataset(self.args.source2_dir, batch_size=self.batch_size,
-                                                     subset='validation',
-                                                     validation_cases=5,
-                                                     seed=42)
-        self.source3_test = BrainSegmentationDataset(self.args.source3_dir, batch_size=self.batch_size,
-                                                     subset='validation',
-                                                     validation_cases=5,
-                                                     seed=42)
+        # 使用 KFold 进行训练
+        self.source1_train = BrainSegmentationKFoldDataset(self.args.source1_dir, batch_size=self.batch_size,
+                                                           subset='train',
+                                                           num_fold=self.num_folds, fold_id=self.fold_id,
+                                                           seed=42)
+        self.source2_train = BrainSegmentationKFoldDataset(self.args.source2_dir, batch_size=self.batch_size,
+                                                           subset='train',
+                                                           num_fold=self.num_folds, fold_id=self.fold_id,
+                                                           seed=42)
+        self.source3_train = BrainSegmentationKFoldDataset(self.args.source3_dir, batch_size=self.batch_size,
+                                                           subset='train',
+                                                           num_fold=self.num_folds, fold_id=self.fold_id,
+                                                           seed=42)
+
+        self.source1_test = BrainSegmentationKFoldDataset(self.args.source1_dir, batch_size=self.batch_size,
+                                                          subset='validation',
+                                                          num_fold=self.num_folds, fold_id=self.fold_id,
+                                                          seed=42)
+        self.source2_test = BrainSegmentationKFoldDataset(self.args.source2_dir, batch_size=self.batch_size,
+                                                          subset='validation',
+                                                          num_fold=self.num_folds, fold_id=self.fold_id,
+                                                          seed=42)
+        self.source3_test = BrainSegmentationKFoldDataset(self.args.source3_dir, batch_size=self.batch_size,
+                                                          subset='validation',
+                                                          num_fold=self.num_folds, fold_id=self.fold_id,
+                                                          seed=42)
         best_dice = 0
 
         for epoch in range(start_epoch, self.epoch):
@@ -254,20 +287,21 @@ class Trainer(object):
                     self.sess.run(tf.assign(self.learning_rate_node, _pre_lr * 0.95))
 
                     with open(os.path.join(self.log_dir, 'eva.txt'), 'a') as f:
+                        to_step = float(self.global_step.eval())
                         dice_teacher_1, dice_arr_teacher_1, dice_student_1, dice_arr_student_1 = self.test(
-                            self.source1_test, 1)
+                            self.source1_test, 1, to_step)
                         # print >> f, "step ", self.global_step.eval()
                         # print >> f, "    source 1 dice teacher is: ", dice_teacher_1, dice_arr_teacher_1
                         # print >> f, "    source 1 dice student is: ", dice_student_1, dice_arr_student_1
-                        f.write(f"step : {self.global_step.eval()}\n"
+                        f.write(f"step : {to_step}\n"
                                 f"\tsource 1 dice teacher is : {dice_teacher_1}, {dice_arr_teacher_1}\n"
                                 f"\tsource 1 dice student is:  {dice_student_1}, {dice_arr_student_1}\n")
                         dice_teacher_2, dice_arr_teacher_2, dice_student_2, dice_arr_student_2 = self.test(
-                            self.source2_test, 2)
+                            self.source2_test, 2, to_step)
                         f.write(f"\tsource 2 dice teacher is : {dice_teacher_2}, {dice_arr_teacher_2}\n"
                                 f"\tsource 2 dice student is:  {dice_student_2}, {dice_arr_student_2}\n")
                         dice_teacher_3, dice_arr_teacher_3, dice_student_3, dice_arr_student_3 = self.test(
-                            self.source3_test, 3)
+                            self.source3_test, 3, to_step)
                         f.write(f"\tsource 3 dice teacher is : {dice_teacher_3}, {dice_arr_teacher_3}\n"
                                 f"\tsource 3 dice student is:  {dice_student_3}, {dice_arr_student_3}\n")
                         f.write(
@@ -275,7 +309,7 @@ class Trainer(object):
                         f.write(
                             f"\tsource ave dice student is: {(dice_student_1 + dice_student_2 + dice_student_3) / 3}\n")
                         # 输出到控制台
-                        logging.info(f"step: {self.global_step.eval()}\n"
+                        logging.info(f"step: {to_step}\n"
                                      f"\tsource 1 dice teacher is : {dice_teacher_1}, {dice_arr_teacher_1}\n"
                                      f"\tsource 1 dice student is:  {dice_student_1}, {dice_arr_student_1}\n"
                                      f"\tsource 2 dice teacher is : {dice_teacher_2}, {dice_arr_teacher_2}\n"
@@ -289,7 +323,7 @@ class Trainer(object):
 
         return 0
 
-    def test(self, dataset: BrainSegmentationDataset, domain, test_model=None):
+    def test(self, dataset: BrainSegmentationKFoldDataset, domain, step, test_model=None):
 
         if domain == 1:
             # student_pred_mask = self.net.source_1_student_pred_compact
@@ -298,16 +332,22 @@ class Trainer(object):
             student_pred_mask = self.net.source1_student_pred
             teacher_pred_mask = self.net.source1_teacher_pred
             data_place = self.net.source_1
+            record = self.source1_dice_loss_record
+            out_file = f"{self.log_dir}/source1_dice_record.json"
 
         elif domain == 2:
             student_pred_mask = self.net.source2_student_pred
             teacher_pred_mask = self.net.source2_teacher_pred
             data_place = self.net.source_2
+            record = self.source2_dice_loss_record
+            out_file = f"{self.log_dir}/source2_dice_record.json"
 
         elif domain == 3:
             student_pred_mask = self.net.source3_student_pred
             teacher_pred_mask = self.net.source3_teacher_pred
             data_place = self.net.source_3
+            record = self.source3_dice_loss_record
+            out_file = f"{self.log_dir}/source3_dice_record.json"
         else:
             raise NotImplementedError
         if test_model is not None:
@@ -322,13 +362,13 @@ class Trainer(object):
             vol = np.expand_dims(image, axis=0)  # 增加一个 batch 的维度
             # 按照一个批次输出dice
             pred_teacher = self.sess.run(teacher_pred_mask, feed_dict={data_place: vol,
-                                                                         self.net.keep_prob: self.dropout,
-                                                                         self.net.training_mode_encoder: False,
-                                                                         self.net.training_mode_decoder: False})
+                                                                       self.net.keep_prob: self.dropout,
+                                                                       self.net.training_mode_encoder: False,
+                                                                       self.net.training_mode_decoder: False})
             pred_student = self.sess.run(student_pred_mask, feed_dict={data_place: vol,
-                                                                         self.net.keep_prob: self.dropout,
-                                                                         self.net.training_mode_encoder: False,
-                                                                         self.net.training_mode_decoder: False})
+                                                                       self.net.keep_prob: self.dropout,
+                                                                       self.net.training_mode_encoder: False,
+                                                                       self.net.training_mode_decoder: False})
             y_ture.append(mask)  # mask 直接添加即可，因为 batch=1
             y_teacher_pred.extend([pred_teacher[b] for b in range(pred_teacher.shape[0])])
             y_student_pred.extend([pred_teacher[b] for b in range(pred_student.shape[0])])
@@ -383,8 +423,17 @@ class Trainer(object):
         # print np.mean(dice_student, axis=0).tolist()
         dice_avg_teacher = np.mean(teacher_dscs)
         dice_avg_student = np.mean(student_dscs)
-        logging.info("dice_avg_teacher %.4f" % (dice_avg_teacher))
-        logging.info("dice_avg_student %.4f" % (dice_avg_student))
+        logging.info("dice_avg_teacher %.4f" % dice_avg_teacher)
+        logging.info("dice_avg_student %.4f" % dice_avg_student)
+        record.append({
+            'teacher_dice': teacher_dscs,
+            'student_dice': student_dscs,
+            'teacher_dice_mean': dice_avg_teacher,
+            'student_dice_mean': dice_avg_student,
+            'step': step
+        })
+        with open(out_file, 'w') as fp:
+            json.dump(record, fp)
 
         return dice_avg_teacher, teacher_dscs, dice_avg_student, student_dscs
 
@@ -482,15 +531,15 @@ class Trainer(object):
         # summary_writer.add_summary(summary_img, step)
         # summary_writer.flush()
         summary_str = self.sess.run(self.source_scalar_summary_op,
-                                                 feed_dict={self.net.source_1: batch_x_1,
-                                                            self.net.source_1_y: batch_y_1,
-                                                            self.net.source_2: batch_x_2,
-                                                            self.net.source_2_y: batch_y_2,
-                                                            self.net.source_3: batch_x_3,
-                                                            self.net.source_3_y: batch_y_3,
-                                                            self.net.training_mode_encoder: False,
-                                                            self.net.training_mode_decoder: False,
-                                                            self.net.keep_prob: 1.})
+                                    feed_dict={self.net.source_1: batch_x_1,
+                                               self.net.source_1_y: batch_y_1,
+                                               self.net.source_2: batch_x_2,
+                                               self.net.source_2_y: batch_y_2,
+                                               self.net.source_3: batch_x_3,
+                                               self.net.source_3_y: batch_y_3,
+                                               self.net.training_mode_encoder: False,
+                                               self.net.training_mode_decoder: False,
+                                               self.net.keep_prob: 1.})
         summary_writer.add_summary(summary_str, step)
         # summary_writer.add_summary(summary_img, step)
         summary_writer.flush()

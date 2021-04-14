@@ -5,6 +5,7 @@ def weight_variable(shape, stddev=0.1, trainable=True, name=None):
     initial = tf.truncated_normal(shape, stddev=stddev)
 
     return tf.get_variable(name = name, shape = shape, trainable = trainable, initializer = tf.truncated_normal_initializer(stddev = stddev))
+    # return tf.get_variable(name = name, shape = shape, trainable = trainable, initializer = tf.glorot_uniform_initializer())
     #return tf.Variable(initial, trainable=trainable, name=name)
 
 
