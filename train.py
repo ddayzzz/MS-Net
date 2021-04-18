@@ -173,27 +173,33 @@ class Trainer(object):
         self.source1_train = BrainSegmentationKFoldDataset(self.args.source1_dir, batch_size=self.batch_size,
                                                            subset='train',
                                                            num_fold=self.num_folds, fold_id=self.fold_id,
+                                                           only_whole_tumor_label=True,
                                                            seed=42)
         self.source2_train = BrainSegmentationKFoldDataset(self.args.source2_dir, batch_size=self.batch_size,
                                                            subset='train',
                                                            num_fold=self.num_folds, fold_id=self.fold_id,
+                                                           only_whole_tumor_label=True,
                                                            seed=42)
         self.source3_train = BrainSegmentationKFoldDataset(self.args.source3_dir, batch_size=self.batch_size,
                                                            subset='train',
                                                            num_fold=self.num_folds, fold_id=self.fold_id,
+                                                           only_whole_tumor_label=True,
                                                            seed=42)
 
         self.source1_test = BrainSegmentationKFoldDataset(self.args.source1_dir, batch_size=self.batch_size,
                                                           subset='validation',
                                                           num_fold=self.num_folds, fold_id=self.fold_id,
+                                                          only_whole_tumor_label=True,
                                                           seed=42)
         self.source2_test = BrainSegmentationKFoldDataset(self.args.source2_dir, batch_size=self.batch_size,
                                                           subset='validation',
                                                           num_fold=self.num_folds, fold_id=self.fold_id,
+                                                          only_whole_tumor_label=True,
                                                           seed=42)
         self.source3_test = BrainSegmentationKFoldDataset(self.args.source3_dir, batch_size=self.batch_size,
                                                           subset='validation',
                                                           num_fold=self.num_folds, fold_id=self.fold_id,
+                                                          only_whole_tumor_label=True,
                                                           seed=42)
         best_dice = 0
 
@@ -326,25 +332,29 @@ class Trainer(object):
     def test(self, dataset: BrainSegmentationKFoldDataset, domain, step, test_model=None):
 
         if domain == 1:
-            # student_pred_mask = self.net.source_1_student_pred_compact
-            # teacher_pred_mask = self.net.source_1_teacher_pred_compact
+            student_pred_mask = self.net.source_1_student_pred_compact
+            teacher_pred_mask = self.net.source_1_teacher_pred_compact
             # data_place = self.net.source_1
-            student_pred_mask = self.net.source1_student_pred
-            teacher_pred_mask = self.net.source1_teacher_pred
+            # student_pred_mask = self.net.source1_student_pred
+            # teacher_pred_mask = self.net.source1_teacher_pred
             data_place = self.net.source_1
             record = self.source1_dice_loss_record
             out_file = f"{self.log_dir}/source1_dice_record.json"
 
         elif domain == 2:
-            student_pred_mask = self.net.source2_student_pred
-            teacher_pred_mask = self.net.source2_teacher_pred
+            student_pred_mask = self.net.source_2_student_pred_compact
+            teacher_pred_mask = self.net.source_2_teacher_pred_compact
+            # student_pred_mask = self.net.source2_student_pred
+            # teacher_pred_mask = self.net.source2_teacher_pred
             data_place = self.net.source_2
             record = self.source2_dice_loss_record
             out_file = f"{self.log_dir}/source2_dice_record.json"
 
         elif domain == 3:
-            student_pred_mask = self.net.source3_student_pred
-            teacher_pred_mask = self.net.source3_teacher_pred
+            # student_pred_mask = self.net.source3_student_pred
+            # teacher_pred_mask = self.net.source3_teacher_pred
+            student_pred_mask = self.net.source_3_student_pred_compact
+            teacher_pred_mask = self.net.source_3_teacher_pred_compact
             data_place = self.net.source_3
             record = self.source3_dice_loss_record
             out_file = f"{self.log_dir}/source3_dice_record.json"
@@ -369,7 +379,7 @@ class Trainer(object):
                                                                        self.net.keep_prob: self.dropout,
                                                                        self.net.training_mode_encoder: False,
                                                                        self.net.training_mode_decoder: False})
-            y_ture.append(mask)  # mask 直接添加即可，因为 batch=1
+            y_ture.append(mask[:, :, 0])  # mask 直接添加即可，因为 batch=1, 由于只有一个类别，compact  输出的是一个 argmax 的结果，没有 channel 的维度
             y_teacher_pred.extend([pred_teacher[b] for b in range(pred_teacher.shape[0])])
             y_student_pred.extend([pred_teacher[b] for b in range(pred_student.shape[0])])
         # 接着按照

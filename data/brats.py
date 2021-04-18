@@ -6,6 +6,24 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from sklearn.model_selection import KFold
 
+def _label_decomp(label_vol, num_cls):
+    """
+    decompose label for softmax classifier
+    original labels are batchsize * W * H * 1, with label values 0,1,2,3...
+    this function decompse it to one hot, e.g.: 0,0,0,1,0,0 in channel dimension
+    numpy version of tf.one_hot
+    """
+    one_hot = []
+    for i in range(num_cls):
+        _vol = np.zeros(label_vol.shape)
+        _vol[label_vol == i] = 1
+        one_hot.append(_vol)
+
+    if label_vol.ndim == 4:
+        return np.concatenate(one_hot, axis=-1)
+    elif label_vol.ndim == 3:
+        return np.stack(one_hot, axis=-1)
+
 class BrainSegmentationDataset(object):
     """Brain MRI dataset for FLAIR abnormality segmentation"""
 
@@ -19,6 +37,7 @@ class BrainSegmentationDataset(object):
             subset="train",
             validation_cases=10,
             seed=42,
+            only_whole_tumor_label=False
     ):
         """
 
@@ -48,11 +67,20 @@ class BrainSegmentationDataset(object):
                 )
         print(f'Num of patients: {len(self.patients)}')
 
+        if only_whole_tumor_label:
+            print("Only using WT label")
         self.volumes = []
         for subject_name in self.patients:
             img = f"{images_dir}/{subject_name}/{subject_name}.npy"
             mask = f"{images_dir}/{subject_name}/{subject_name}_seg.npy"
-            self.volumes.append((np.load(img)[1:-1, :, :, :], np.load(mask)[1:-1, :, :, :]))
+            if only_whole_tumor_label:
+                # 第0标签是 WT，但是需要保持对应的维度
+                mask = np.load(mask)[1:-1, :, :, 0:1]
+                onehot_mask = _label_decomp(mask, num_cls=2)
+                # 这里需要变成 one-hot 的形式
+                self.volumes.append((np.load(img)[1:-1, :, :, :], onehot_mask))
+            else:
+                self.volumes.append((np.load(img)[1:-1, :, :, :], np.load(mask)[1:-1, :, :, :]))
         # 对应样本 slice 的被选中的概率与slice对应的 mask 的概率有关
         self.slice_weights = [m.sum(axis=-1).sum(axis=-1).sum(axis=-1) for v, m in self.volumes]
         self.slice_weights = [
@@ -126,6 +154,7 @@ class BrainSegmentationKFoldDataset(object):
             fold_id,
             subset="train",
             seed=42,
+            only_whole_tumor_label=False
     ):
         """
 
@@ -172,12 +201,19 @@ class BrainSegmentationKFoldDataset(object):
             self.patients = [self.patients[sid] for sid in fold_train_val[1]]
         print(f"Selecting Fold: {fold_id}")
 
-
+        if only_whole_tumor_label:
+            print("Only using WT label")
         self.volumes = []
         for subject_name in self.patients:
             img = f"{images_dir}/{subject_name}/{subject_name}.npy"
             mask = f"{images_dir}/{subject_name}/{subject_name}_seg.npy"
-            self.volumes.append((np.load(img)[1:-1, :, :, :], np.load(mask)[1:-1, :, :, :]))
+            if only_whole_tumor_label:
+                mask = np.load(mask)[1:-1, :, :, 0:1]
+                onehot_mask = _label_decomp(mask, num_cls=2)
+                # 这里需要变成 one-hot 的形式
+                self.volumes.append((np.load(img)[1:-1, :, :, :], onehot_mask))
+            else:
+                self.volumes.append((np.load(img)[1:-1, :, :, :], np.load(mask)[1:-1, :, :, :]))
         # 对应样本 slice 的被选中的概率与slice对应的 mask 的概率有关
         self.slice_weights = [m.sum(axis=-1).sum(axis=-1).sum(axis=-1) for v, m in self.volumes]
         self.slice_weights = [
@@ -239,9 +275,10 @@ class BrainSegmentationKFoldDataset(object):
 
 if __name__ == '__main__':
     dataset = BrainSegmentationDataset(
-        images_dir=r'/home/liuyuan/shu_codes/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_1_5',
+        images_dir=r'/home/wangshu/datasets/brats/splited_by_ManufacturerModelName_preprocessed/train/signa_excite_1_5',
         validation_cases=1,
-        batch_size=1)
+        batch_size=1,
+        only_whole_tumor_label=True)
 
     num_slices = np.bincount([p[0] for p in dataset.patient_slice_index])
     f = dataset.get_one_batch(32)

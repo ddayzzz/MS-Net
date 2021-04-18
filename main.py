@@ -35,8 +35,8 @@ def parse_args(train_date):
     parser.add_argument('--fold_id', type=int, required=True, help='选择的 Fold 的分类')
 
     parser.add_argument('--volume_size', type=list, default=[224, 224, 4], help='The size of input data')
-    parser.add_argument('--label_size', type=list, default=[224, 224, 3], help='The size of label')
-    parser.add_argument('--n_class', type=int, default=3, help='The size of class')
+    parser.add_argument('--label_size', type=list, default=[224, 224, 2], help='The size of label')
+    parser.add_argument('--n_class', type=int, default=2, help='The size of class')
     parser.add_argument('--msnet', default=False, action='store_true', help='是否使用 MS-Net 的网络')
 
     parser.add_argument('--lr', type=float, default=0.0001, help='The learning rate')
@@ -84,9 +84,9 @@ def parse_args(train_date):
 def check_args(args):
     import time
     if args.msnet:
-        sub = f"brats_msnet_kfold/fold_{args.num_folds}_foldid_{args.fold_id}/{time.strftime('exp_%Y-%m-%dT%H-%M-%S')}"
+        sub = f"brats_msnet_softmax_kfold/fold_{args.num_folds}_foldid_{args.fold_id}/{time.strftime('exp_%Y-%m-%dT%H-%M-%S')}"
     else:
-        sub = f"brats_flnet_kfold/fold_{args.num_folds}_foldid_{args.fold_id}/{time.strftime('exp_%Y-%m-%dT%H-%M-%S')}"
+        sub = f"brats_flnet_softmax_kfold/fold_{args.num_folds}_foldid_{args.fold_id}/{time.strftime('exp_%Y-%m-%dT%H-%M-%S')}"
     # 重新指定文件夹
     args.checkpoint_dir = f"{sub}/checkpoint"
     # --checkpoint_dir
@@ -107,6 +107,7 @@ def main():
     # parse arguments
     train_date = '2021-04-09'
     args = parse_args(train_date)
+    assert args.msnet, "还没有修改好 Network_fl"
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
